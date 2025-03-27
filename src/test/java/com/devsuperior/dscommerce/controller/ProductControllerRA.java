@@ -22,7 +22,7 @@ import io.restassured.http.ContentType;
 
 public class ProductControllerRA {
     
-    private Long existingProductId, nonExistingProductId;
+    private Long existingProductId, nonExistingProductId, dependentProductId;
     private String clientUserName, clientPassword, adminUserName, adminPassword;
     private Map<String, Object> postProductInstance;
     private String adminToken, clientToken, invalidToken;
@@ -57,12 +57,16 @@ public class ProductControllerRA {
         adminToken = new TokenUtil().obtainAccesToken(adminUserName, adminPassword);
         clientToken = new TokenUtil().obtainAccesToken(clientUserName, clientPassword);
         invalidToken = adminToken + "invalid";
+
+        
+        existingProductId = 1L;
+        nonExistingProductId = 1000L;
+        dependentProductId = 3L;
     }
 
     @Test
     public void findByIdShoulhReturnProductWhenIdExists(){
 
-        existingProductId = 2L;
 
         given()
             .get("/products/{id}", existingProductId)
@@ -78,8 +82,6 @@ public class ProductControllerRA {
 
     @Test
     public void findByIdShoulhReturnNotFoundWhenIdDoesNotExists(){
-
-        nonExistingProductId = 2000L;
 
         given()
             .get("/products/{id}", nonExistingProductId)
@@ -231,6 +233,57 @@ public class ProductControllerRA {
 		.then()
 			.statusCode(422)
             .body("errors.message[0]", equalTo("Deve ter pelo menos uma categoria"));
+    }
+
+    @Test
+    public void deleteShouldReturnNoContentWhenAdminsIsLoggedAndProductExists(){
+
+        //Seta um produto que não esteja associado a um pedido para exclusão
+        existingProductId = 14L;
+
+		given()
+			.header("Authorization", "Bearer " + adminToken)
+		.when()
+			.delete("/products/{id}", existingProductId)
+		.then()
+			.statusCode(204);
+            
+    }
+
+    @Test
+    public void deleteShouldReturnNotFoundWhenAdminsIsLoggedAndProductDoesNotExists(){
+
+        given()
+			.header("Authorization", "Bearer " + adminToken)
+		.when()
+			.delete("/products/{id}", nonExistingProductId)
+		.then()
+			.statusCode(404);
+    }
+
+    @Test
+    public void deleteShouldReturnDatabaseExceptionWhenAdminsIsLoggedAndProductIsDependent(){
+        
+
+		given()
+			.header("Authorization", "Bearer " + adminToken)
+		.when()
+			.delete("/products/{id}", dependentProductId)
+		.then()
+			.statusCode(400);
+    }
+
+    
+    @Test
+    public void deleteShouldReturnForbiddenWhenClientIsLogged(){
+        existingProductId = 1L;
+        given()
+			.header("Authorization", "Bearer " + clientToken)
+		.when()
+			.delete("/products/{id}", existingProductId)
+		.then()
+			.statusCode(400);
+            
     }
 
 }
